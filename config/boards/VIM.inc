@@ -1,3 +1,4 @@
+#!/bin/bash
 ##########################
 ## VIM series common part
 ##########################
@@ -71,6 +72,9 @@ uboot_custom_postprocess() {
 	export_variables
 
 	source ${FIP_FOLDER}${CUR_SOC}/variable_soc.sh
+
+	# compile fip tools for ddr_parse and map_tool
+	prepare_tools > /dev/null 2>&1 || true
 
 	# source soc package script
 	source ${FIP_FOLDER}${CUR_SOC}/build.sh
@@ -159,10 +163,68 @@ setup_write_uboot_platform()
 }
 
 ## Pack image
+
+pack_image_platform_raw() {
+
+	# ABOUT
+
+	# this simple raw image suitable for dd write to eMMC
+	# same for Krescue usage
+	# simple alternative for amlogic image
+
+	# USAGE
+	#
+	# INSTALL_TYPE_RAW=yes make
+	#
+	# INSTALL_TYPE_RAW=yes COMPRESS_IMAGE=yes make
+
+	[ "$INSTALL_TYPE" != "EMMC" ] && return
+	[ "$INSTALL_TYPE_RAW" != "yes" ] && return
+
+	info_msg "Simple raw image suitable for dd write -> $IMAGE_FILE_NAME"
+
+	BS=512
+
+	ROOT_OFFSET=0x0b400000
+	DTB1_OFFSET=0x02800000
+	DTB2_OFFSET=0x02840000
+	LOGO_OFFSET=0x07c00000
+
+	PATH_BOOT="u-boot/fip/_tmp/u-boot.bin.sd.bin"
+	PATH_DTB0="linux/$LINUX_DTB"
+	PATH_ROOT="$BUILD_IMAGES/rootfs.img"
+	PATH_LOGO="$BUILD_IMAGES/logo.img"
+
+	F="conv=fsync,notrunc status=noxfer"
+	F1="$F,none"
+	F2="$F,progress"
+
+	IMG="$BUILD_IMAGES/$IMAGE_FILE_NAME"
+
+	rm -rf $IMG
+
+	(
+		dd of="$IMG" if=/dev/null    $F1 seek=$((ROOT_OFFSET/BS))
+		dd of="$IMG" if="$PATH_BOOT" $F1
+		dd of="$IMG" if="$PATH_DTB0" $F1 seek=$((DTB1_OFFSET/BS))
+		dd of="$IMG" if="$PATH_DTB0" $F1 seek=$((DTB2_OFFSET/BS))
+		dd of="$IMG" if="$PATH_LOGO" $F1 seek=$((LOGO_OFFSET/BS))
+		dd of="$IMG" if="$PATH_ROOT" $F2 seek=$((ROOT_OFFSET/BS))
+	)
+}
+
 pack_image_platform() {
+
+	if [ "$1" == "uboot-image" ]; then
+		PACK_UBOOT_IMAGE="yes"
+	else
+		PACK_UBOOT_IMAGE="no"
+	fi
+
 	cd ${ROOT}
 
 	info_msg "Image install type: $INSTALL_TYPE"
+
 	if [ "$INSTALL_TYPE" == "EMMC" ]; then
 		## Fixup upgrade dtb link
 		cd $UPGRADE_DIR/Amlogic
@@ -185,16 +247,27 @@ pack_image_platform() {
 		ln -fs "$IMAGE_PLATFORM_CONF" platform.conf
 
 		## Fixup rootfs.img
-		ln -fs ../../images/rootfs.img rootfs.img
+		if [ "$PACK_UBOOT_IMAGE" != "yes" ]; then
+			ln -fs ../../images/rootfs.img rootfs.img
+		else
+			IMAGE_FILE_NAME="${KHADAS_BOARD}_Uboot_EMMC_${IMAGE_RELEASE_VERSION}.img"
+			ln -fs fake-rootfs.img rootfs.img
+		fi
 
-		cd -
+		cd - > /dev/null
 
 		$UTILS_DIR/aml_image_v2_packer -r $UPGRADE_DIR/Amlogic/package.conf $UPGRADE_DIR/Amlogic $BUILD_IMAGES/${IMAGE_FILE_NAME}
     elif [ "$INSTALL_TYPE" == "SD-USB" ]; then
+		if [ "$PACK_UBOOT_IMAGE" == "yes" ]; then
+			IMAGE_FILE_NAME="${KHADAS_BOARD}_Uboot_SD_${IMAGE_RELEASE_VERSION}.img"
+			info_msg "Create Uboot SD image..."
+			dd if=/dev/zero of=${BUILD_IMAGES}/${IMAGE_FILE_NAME} bs=1M count=0 seek=4 > /dev/null 2>&1
+		fi
+
 		write_uboot_platform "$UBOOT_IMAGE_DIR" "$BUILD_IMAGES/$IMAGE_FILE_NAME"
     else
         error_msg "Unsupported install type: '$INSTALL_TYPE'"
-        return -1
+        return 1
     fi
 
     echo ""

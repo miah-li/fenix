@@ -1,10 +1,10 @@
 PKG_NAME="u-boot-mainline"
-PKG_VERSION="caad316b3165615f1a4848901811a4a084444c9d"
-PKG_SOURCE_DIR="u-boot-$PKG_VERSION"
-PKG_SOURCE_NAME="u-boot-$PKG_VERSION.tar.gz"
+PKG_VERSION="v2021.01"
+PKG_SOURCE_DIR="u-boot-${PKG_VERSION#v}"
+PKG_SOURCE_NAME="u-boot-${PKG_VERSION#v}.tar.gz"
 PKG_SITE="https://github.com/u-boot/u-boot"
 PKG_URL="$PKG_SITE/archive/$PKG_VERSION.tar.gz"
-PKG_SHA256="87006eb9e3b070894db2f61b01727c1d5abc7d20f9b5db9e2db1d079474afad1"
+PKG_SHA256="d3f8fbd819d033c8cb964c624a7cf61cfb9ca75782c3fe55be78006768a4ed1c"
 PKG_SHORTDESC="u-boot: Universal Bootloader project"
 PKG_ARCH="arm aarch64"
 PKG_LICENSE="GPL"
@@ -20,10 +20,18 @@ make_target() {
 
 post_make_target() {
 
-	# add embed uboot khadas logo
-	cat u-boot-nodtb.bin u-boot.dtb "$PKGS_DIR/$PKG_NAME/files/splash.bmp.gz" > u-boot.bin
-
 	if [ "$VENDOR" == "Amlogic" ]; then
+
+		# add embed uboot khadas logo
+		# cat u-boot-nodtb.bin u-boot.dtb "$PKGS_DIR/$PKG_NAME/files/splash.bmp.gz" > u-boot.bin
+		# new safe method
+		echo "[i] inject dtb logo">&2
+		dtc -q u-boot.dtb > u-boot.dts
+		LOGO_PATH="$PKGS_DIR/$PKG_NAME/files/splash.bmp.gz" \
+		sh "$PKGS_DIR/$PKG_NAME/files/u-boot.logo.tpl" >> u-boot.dts
+		dtc -q u-boot.dts > u-boot.dtb
+		cat u-boot-nodtb.bin u-boot.dtb > u-boot.bin
+
 		# Add firmware
 		rm -rf "$BUILD/$PKG_NAME-$PKG_VERSION/fip"
 		cp -r "$PKGS_DIR/$PKG_NAME/fip/$KHADAS_BOARD" "$BUILD/$PKG_NAME-$PKG_VERSION/fip"

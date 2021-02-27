@@ -1,3 +1,4 @@
+#!/bin/bash
 ###################################
 ## VIM3 series common part
 ###################################
@@ -86,6 +87,14 @@ build_deb_packages_platform() {
 		rm -rf $BUILD/.stamps/npu_aml
 		build_package "npu_aml:target"
 
+		if [ "$KHADAS_BOARD" == "VIM3" ]; then
+			info_msg "Building tengine_libs_deb packages..."
+			# FIXME
+			# remove build stamp to force build for other arch
+			rm -rf $BUILD/.stamps/tengine_libs_deb
+			build_package "tengine_libs_deb:target"
+		fi
+
 		info_msg "Building opencv3 packages..."
 		# FIXME
 		# remove build stamp to force build for other arch
@@ -116,6 +125,15 @@ build_deb_packages_platform() {
 		rm -rf $BUILD/.stamps/encoder_libs_deb_aml
 		build_package "encoder_libs_deb_aml:target"
 	fi
+
+	if [ "$LINUX" == "mainline" ] && [ "$DISTRIB_RELEASE" != "bionic" ] && [ "$DISTRIB_TYPE" != "server" ]; then
+		info_msg "Building mesa..."
+		# FIXME
+		# remove build stamp to force build for other arch
+		rm -rf $BUILD/.stamps/mesa_debs
+		build_package "mesa_debs:target"
+	fi
+
 }
 
 ## Install deb packages for platform
@@ -156,6 +174,11 @@ install_deb_packages_platform() {
 		info_msg "Installing npu_aml packages..."
 		install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/npu_aml/*.deb
 
+		if [ "$KHADAS_BOARD" == "VIM3" ]; then
+			info_msg "Installing tengine_libs_deb packages..."
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/tengine_libs_deb/*.deb
+		fi
+
 		info_msg "Installing opencv3 packages..."
 		install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/opencv3/*.deb
 
@@ -178,5 +201,29 @@ install_deb_packages_platform() {
 
 		# Install encoder libriries in chroot
 		install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/encoder/*.deb
+	fi
+
+	if [ "$LINUX" == "mainline" ] && [ "$DISTRIB_TYPE" != "server" ]; then
+		# Install mesa in chroot
+		info_msg "Installing mesa..."
+
+		if [ "$DISTRIB_RELEASE" == "focal" ]; then
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libd3dadapter9-mesa_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libegl1-mesa_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libgbm1_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libglapi-mesa_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libgl1-mesa-dri_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libgles2-mesa_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libegl-mesa0_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libglx-mesa0_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libgl1-mesa-glx_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libosmesa6_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/libwayland-egl1-mesa_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/mesa-opencl-icd_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/mesa-va-drivers_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/mesa-vdpau-drivers_*_arm64.deb
+			install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/mesa-vulkan-drivers_*_arm64.deb
+			#install_deb_chroot $BUILD_DEBS/$VERSION/$KHADAS_BOARD/${DISTRIBUTION}-${DISTRIB_RELEASE}/mesa/mesa/mesa-common-dev_*_arm64.deb
+		fi
 	fi
 }

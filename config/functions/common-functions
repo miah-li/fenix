@@ -16,6 +16,7 @@
 # create_sources_list
 # compress_image
 # check_make_params
+# get_available_make_params
 
 ## Print error message
 ## $1 - message
@@ -102,8 +103,10 @@ prepare_host() {
 				cp -r ~/toolchains/* downloads/
 			fi
 			# Walkaround for ccache permissions
-			if [ "$(stat -c '%U %G' ~/.ccache/)" != "khadas khadas" ]; then
-				sudo chown khadas:khadas -R ~/.ccache/
+			if [ -d ~/.ccache ]; then
+				if [ "$(stat -c '%U %G' ~/.ccache/)" != "khadas khadas" ]; then
+					sudo chown khadas:khadas -R ~/.ccache/
+				fi
 			fi
 		fi
 	fi
@@ -150,24 +153,24 @@ prepare_host() {
 	fi
 
 	# enable arm binary format so that the cross-architecture chroot environment will work
-	if ! grep -q binfmt_misc <(lsmod); then
-		info_msg "Module 'binfmt_misc' not installed, try to install it!"
-		warning_msg "Requires root privileges, please enter your passowrd!"
-		sudo modprobe -q binfmt_misc || {
-			# FIXME 'binfmt_misc' should be installed on host PC manually
-			# https://github.com/khadas/fenix/issues/35#issuecomment-492326880
-			if systemd-detect-virt -q -c; then
-				error_msg "You are built in container: $(systemd-detect-virt), but the module 'binfmt_misc' is not installed, please exit the container to execute 'sudo modprobe binfmt_misc' on your host PC and try again!"
-			fi
+	mountpoint -q /proc/sys/fs/binfmt_misc/ || sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc || {
+		if ! grep -q binfmt_misc <(lsmod); then
+			info_msg "Module 'binfmt_misc' not installed, try to install it!"
+			warning_msg "Requires root privileges, please enter your password!"
+			sudo modprobe -q binfmt_misc || {
+				# FIXME 'binfmt_misc' should be installed on host PC manually
+				# https://github.com/khadas/fenix/issues/35#issuecomment-492326880
+				if systemd-detect-virt -q -c; then
+                    error_msg "You are built in container: $(systemd-detect-virt), but the module 'binfmt_misc' is not installed, please exit the container to execute 'sudo modprobe binfmt_misc' on your host PC and try again!"
+				fi
 
-			exit -1
-		}
-	fi
-	if  grep -q binfmt_misc <(lsmod); then
-		mountpoint -q /proc/sys/fs/binfmt_misc/ || sudo mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
-		test -e /proc/sys/fs/binfmt_misc/qemu-arm || sudo update-binfmts --enable qemu-arm
-		test -e /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo update-binfmts --enable qemu-aarch64
-	fi
+				exit -1
+			}
+		fi
+    }
+
+	test -e /proc/sys/fs/binfmt_misc/qemu-arm || sudo update-binfmts --enable qemu-arm
+	test -e /proc/sys/fs/binfmt_misc/qemu-aarch64 || sudo update-binfmts --enable qemu-aarch64
 }
 
 ## Mount chroot
@@ -363,39 +366,58 @@ create_sources_list()
 }
 
 ## compress_image
-compress_image()
-{
-	[[ $COMPRESS_IMAGE != yes ]] && exit
+compress_image() {
+	[[ $COMPRESS_IMAGE != yes ]] && return
 
 	echo ""
 	info_msg "Compressing image '$BUILD_IMAGES/$IMAGE_FILE_NAME' to '$BUILD_IMAGES/${IMAGE_FILE_NAME}.xz' ..."
 
 	rm -rf $BUILD_IMAGES/${IMAGE_FILE_NAME}.xz
 
-	if [ "$INSTALL_TYPE" == "SD-USB" ]; then
+	if [ "$INSTALL_TYPE" == "SD-USB" -o "$INSTALL_TYPE_RAW" == "yes" ]; then
+		if [ "$1" == "uboot-image" ]; then
+			label="Uboot"
+			desc="Uboot $VERSION minimal - fenix generated images https://github.com/khadas/fenix"
+		else
+			label="$DISTRIBUTION"
+			desc="$DISTRIBUTION $VERSION $DISTRIB_TYPE $DISTRIB_RELEASE - fenix generated images https://github.com/khadas/fenix"
+		fi
 		"$ROOT"/scripts/xze "$BUILD_IMAGES/$IMAGE_FILE_NAME" \
 		    --meta \
-		    LABEL="$DISTRIBUTION" \
+		    LABEL="$label" \
 		    BOARD="$KHADAS_BOARD" \
 		    BUILDER="fenix" \
 		    LINK="https://dl.khadas.com/Firmware/" \
-		    DESC="$DISTRIBUTION $VERSION $DISTRIB_TYPE $DISTRIB_RELEASE - fenix generated images https://github.com/khadas/fenix" \
+		    DESC="$desc" \
 		    > "$BUILD_IMAGES/$IMAGE_FILE_NAME.xz"
 	else
 		"$ROOT"/scripts/xze "$BUILD_IMAGES/$IMAGE_FILE_NAME" > "$BUILD_IMAGES/$IMAGE_FILE_NAME.xz"
 	fi
 
 	echo ""
-	info_msg "COMPRESSED_IMAGE: ${GREEN} $BUILD_IMAGES/$IMAGE_FILE_NAME.xz ${ENDCOLOR} is ready!"
+	info_msg "COMPRESSED IMAGE: ${GREEN} $BUILD_IMAGES/$IMAGE_FILE_NAME.xz ${ENDCOLOR} is ready!"
 }
 
 ## check_make_params
-check_make_params()
-{
+check_make_params() {
 	echo ""
 	for param in $MAKE_PARAMS
 	do
-		printf "${BOLDCYAN}%s:${ENDCOLOR}\t${BOLDGREEN}%s${ENDCOLOR}\n" $param ${!param}
+		printf "${BOLDCYAN}%-25s:${ENDCOLOR}${BOLDGREEN}%10s${ENDCOLOR}\n" $param ${!param}
+	done
+	echo ""
+}
+
+## get_available_make_params
+get_available_make_params() {
+	echo ""
+	printf "${BOLDYELLOW}%-20s${ENDCOLOR}${BOLDYELLOW}%15s${ENDCOLOR}\n" "Parameter" "Value"
+	printf "===============================================\n"
+	for param in $MAKE_PARAMS
+	do
+		key=$param
+		value=${param}_VALUES
+		printf "${BOLDCYAN}%-25s:${ENDCOLOR}${BOLDGREEN}%20s${ENDCOLOR}\n" "$key" "${!value}"
 	done
 	echo ""
 }

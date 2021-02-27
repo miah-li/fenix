@@ -22,22 +22,22 @@ if [ "$LINUX" == "mainline" ]; then
 	LINUX_VER="mainline"
 	UBOOT_VER="mainline"
 	if [ "$DISTRIBUTION" == "Ubuntu" ]; then
-		DISTRIB_TYPES="server gnome"
+		DISTRIB_TYPES="minimal server gnome"
 	else
-		DISTRIB_TYPES="server xfce"
+		DISTRIB_TYPES="minimal server xfce"
 	fi
 else
 	if [ "$BOARD" == "Edge" ]; then
 		LINUX_VER="4.4"
 		UBOOT_VER="2017.09"
-		DISTRIB_TYPES="server lxde"
+		DISTRIB_TYPES="minimal server lxde"
 	else
 		LINUX_VER="4.9"
 		UBOOT_VER="2015.01"
 		if [ "$DISTRIBUTION" == "Ubuntu" ]; then
-			DISTRIB_TYPES="server gnome"
+			DISTRIB_TYPES="minimal server gnome"
 		else
-			DISTRIB_TYPES="server xfce"
+			DISTRIB_TYPES="minimal server xfce"
 		fi
 	fi
 fi
@@ -55,6 +55,7 @@ do
 		source env/setenv.sh config $CONFIG
 		sudo rm -rf build/images/.tmp/*
 		BUILD_TYPE=release COMPRESS_IMAGE=yes NO_CCACHE=yes make || BUILD_TYPE=release COMPRESS_IMAGE=yes NO_CCACHE=yes make
+		BUILD_TYPE=release COMPRESS_IMAGE=yes NO_CCACHE=yes INSTALL_TYPE_RAW=yes make image || BUILD_TYPE=release COMPRESS_IMAGE=yes NO_CCACHE=yes INSTALL_TYPE_RAW=yes make image
 		sudo rm -rf build/images/*.img
 	done
 done

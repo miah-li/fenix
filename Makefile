@@ -25,11 +25,39 @@ else
 	@./scripts/build.sh linux
 endif
 
+kernel-clean:
+ifeq ($(and $(DISTRIBUTION),$(DISTRIB_RELEASE),$(DISTRIB_TYPE),$(DISTRIB_ARCH),$(KHADAS_BOARD),$(LINUX),$(UBOOT),$(INSTALL_TYPE)),)
+	$(call help_message)
+else
+	@./scripts/build.sh linux-clean
+endif
+
+kernel-config:
+ifeq ($(and $(DISTRIBUTION),$(DISTRIB_RELEASE),$(DISTRIB_TYPE),$(DISTRIB_ARCH),$(KHADAS_BOARD),$(LINUX),$(UBOOT),$(INSTALL_TYPE)),)
+	$(call help_message)
+else
+	@./scripts/build.sh linux-config
+endif
+
+kernel-saveconfig:
+ifeq ($(and $(DISTRIBUTION),$(DISTRIB_RELEASE),$(DISTRIB_TYPE),$(DISTRIB_ARCH),$(KHADAS_BOARD),$(LINUX),$(UBOOT),$(INSTALL_TYPE)),)
+	$(call help_message)
+else
+	@./scripts/build.sh linux-saveconfig
+endif
+
 uboot:
 ifeq ($(and $(DISTRIBUTION),$(DISTRIB_RELEASE),$(DISTRIB_TYPE),$(DISTRIB_ARCH),$(KHADAS_BOARD),$(LINUX),$(UBOOT),$(INSTALL_TYPE)),)
 	$(call help_message)
 else
 	@./scripts/build.sh u-boot
+endif
+
+uboot-clean:
+ifeq ($(and $(DISTRIBUTION),$(DISTRIB_RELEASE),$(DISTRIB_TYPE),$(DISTRIB_ARCH),$(KHADAS_BOARD),$(LINUX),$(UBOOT),$(INSTALL_TYPE)),)
+	$(call help_message)
+else
+	@./scripts/build.sh u-boot-clean
 endif
 
 debs: uboot kernel
@@ -96,6 +124,9 @@ else
 	@./scripts/build.sh updater-deb
 endif
 
+get-make-params:
+	@./scripts/param.sh make_params
+
 info:
 	@echo ""
 	@echo "Version: ${VERSION}"
@@ -118,19 +149,24 @@ info:
 
 help:
 	@echo "Fenix scripts help messages:"
-	@echo "  all           - Create image according to environment."
-	@echo "  kernel        - Build linux kernel."
-	@echo "  uboot         - Build u-boot."
-	@echo "  uboot-deb     - Build u-boot debian package."
-	@echo "  uboot-image   - Build minimal image only with u-boot."
-	@echo "  kernel-deb    - Build linux debian package."
-	@echo "  board-deb     - Build board debian package."
-	@echo "  common-deb    - Build common debian package."
-	@echo "  desktop-deb   - Build desktop debian package."
-	@echo "  gpu-deb       - Build gpu debian package."
-	@echo "  debs          - Build all debian packages."
-	@echo "  image         - Pack update image."
-	@echo "  clean         - Cleanup."
-	@echo "  info          - Display current environment."
+	@echo "  all                   - Create image according to environment."
+	@echo "  kernel                - Build linux kernel."
+	@echo "  kernel-clean          - Clean linux source tree."
+	@echo "  kernel-config         - Show linux menuconfig."
+	@echo "  kernel-saveconfig     - Save linux defconfig."
+	@echo "  uboot                 - Build u-boot."
+	@echo "  uboot-clean           - Clean u-boot source tree."
+	@echo "  uboot-deb             - Build u-boot debian package."
+	@echo "  uboot-image           - Build minimal image only with u-boot."
+	@echo "  kernel-deb            - Build linux debian package."
+	@echo "  board-deb             - Build board debian package."
+	@echo "  common-deb            - Build common debian package."
+	@echo "  desktop-deb           - Build desktop debian package."
+	@echo "  gpu-deb               - Build gpu debian package."
+	@echo "  debs                  - Build all debian packages."
+	@echo "  image                 - Pack update image."
+	@echo "  clean                 - Cleanup."
+	@echo "  info                  - Display current environment."
+	@echo "  get-make-params       - Get available make parameters."
 clean:
 	./scripts/clean.sh

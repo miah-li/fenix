@@ -4,6 +4,10 @@
 # build_linux_debs
 # build_uboot_deb
 # build_uboot_image
+# clean_linux
+# clean_uboot
+# config_linux
+# save_linux_config
 
 ## Build U-Boot
 build_uboot() {
@@ -25,7 +29,7 @@ build_uboot() {
 	if [ ! -d u-boot/.git ]; then
 		info_msg "U-boot repository does not exist, clone u-boot repository('$UBOOT_GIT_BRANCH') from '$UBOOT_SOURCE_URL'..."
 		## Clone u-boot from Khadas GitHub
-		git clone --depth 1 $UBOOT_SOURCE_URL -b $UBOOT_GIT_BRANCH
+		git clone $GIT_CLONE_OPTIONS $UBOOT_SOURCE_URL -b $UBOOT_GIT_BRANCH
 		[ $? != 0 ] && error_msg "Failed to clone 'u-boot'" && return -1
 	fi
 
@@ -96,7 +100,7 @@ build_linux() {
 	if [ ! -d linux/.git ]; then
 		info_msg "Linux repository does not exist, clone linux repository('$LINUX_GIT_BRANCH') from '$LINUX_SOURCE_URL'..."
 		## Clone linux from Khadas GitHub
-		git clone --depth 1 $LINUX_SOURCE_URL -b $LINUX_GIT_BRANCH
+		git clone $GIT_CLONE_OPTIONS $LINUX_SOURCE_URL -b $LINUX_GIT_BRANCH
 		[ $? != 0 ] && error_msg "Failed to clone 'linux'" && return -1
 	fi
 
@@ -137,7 +141,7 @@ build_linux() {
 	info_msg "Build linux..."
 	export PATH=$KERNEL_COMPILER_PATH:$PATH
 	make ARCH=arm64 $LINUX_DEFCONFIG
-	make -j${NR_JOBS} ARCH=arm64 CROSS_COMPILE="${CCACHE} ${KERNEL_COMPILER}" Image dtbs  modules
+	make -j${NR_JOBS} ARCH=arm64 CROSS_COMPILE="${CCACHE} ${KERNEL_COMPILER}" Image dtbs  modules $EXTRA_MAKE_ARGS
 }
 
 ## Build linux debs
@@ -297,48 +301,73 @@ build_uboot_deb() {
 	rm -rf $pkgdir
 }
 
-## Build u-boot image
-build_uboot_image() {
+# Clean linux
+clean_linux() {
 
-	if [ "$INSTALL_TYPE" == "EMMC" ]; then
-
-		IMAGE_FILE_NAME="${KHADAS_BOARD}_Uboot_EMMC_${IMAGE_RELEASE_VERSION}.img"
-
-		## Fixup upgrade dtb link
-		cd $UPGRADE_DIR/Amlogic
-		rm -rf kvim.dtb
-		case "$LINUX" in
-			4.9)
-				ln -fs ../../../linux/$LINUX_DTB kvim.dtb
-				ln -fs ../../../u-boot/fip/_tmp/u-boot.bin u-boot.bin
-				ln -fs ../../../u-boot/fip/_tmp/u-boot.bin.sd.bin u-boot.bin.sd.bin
-				ln -fs ../../../u-boot/fip/_tmp/u-boot.bin.usb.bl2 u-boot.bin.usb.bl2
-				ln -fs ../../../u-boot/fip/_tmp/u-boot.bin.usb.tpl u-boot.bin.usb.tpl
-				;;
-			mainline)
-				;;
-		esac
-
-		## Fixup platform & package configuration file
-		ln -fs "$IMAGE_PACKAGE_CONF" package.conf
-		ln -fs "$IMAGE_PLATFORM_CONF" platform.conf
-
-		## Fixup rootfs.img
-		ln -fs fake-rootfs.img rootfs.img
-
-		cd -
-
-		$UTILS_DIR/aml_image_v2_packer -r $UPGRADE_DIR/Amlogic/package.conf $UPGRADE_DIR/Amlogic $BUILD_IMAGES/${IMAGE_FILE_NAME}
+	if [ "$LINUX" == "mainline" ]; then
+		cd $BUILD/linux-mainline-*
 	else
-
-		IMAGE_FILE_NAME="${KHADAS_BOARD}_Uboot_SD_${IMAGE_RELEASE_VERSION}.img"
-
-		info_msg "Create Uboot SD image..."
-		dd if=/dev/zero of=${BUILD_IMAGES}/${IMAGE_FILE_NAME} bs=1M count=0 seek=4 > /dev/null 2>&1
-
-		write_uboot_platform "$UBOOT_IMAGE_DIR" "$BUILD_IMAGES/$IMAGE_FILE_NAME"
+		cd $ROOT/linux/
 	fi
 
-	echo ""
-	info_msg "IMAGE: ${GREEN}$BUILD_IMAGES/$IMAGE_FILE_NAME ${ENDCOLOR} is ready!"
+	info_msg "Clean linux..."
+	export PATH=$KERNEL_COMPILER_PATH:$PATH
+	make ARCH=arm64 distclean
+
+	cd - > /dev/null
+}
+
+# Clean u-boot
+clean_uboot() {
+	if [ "$UBOOT" == "mainline" ]; then
+		cd $BUILD/u-boot-mainline-*
+	else
+		cd $ROOT/u-boot
+	fi
+
+	info_msg "Clean u-boot..."
+	make distclean
+
+	cd - > /dev/null
+}
+
+# Config linux
+config_linux() {
+	if [ "$LINUX" == "mainline" ]; then
+		cd $BUILD/linux-mainline-*
+	else
+		cd $ROOT/linux/
+	fi
+
+	info_msg "Config linux..."
+	export PATH=$KERNEL_COMPILER_PATH:$PATH
+	if [ "$LINUX" == "mainline" ]; then
+		cp $PKGS_DIR/linux-mainline/configs/${KHADAS_BOARD}.config .config
+	else
+		make ARCH=arm64 $LINUX_DEFCONFIG
+	fi
+
+	make ARCH=arm64 CROSS_COMPILE=${KERNEL_COMPILER} menuconfig
+
+	cd - > /dev/null
+}
+
+# Save linux config
+save_linux_config() {
+	if [ "$LINUX" == "mainline" ]; then
+		cd $BUILD/linux-mainline-*
+	else
+		cd $ROOT/linux/
+	fi
+
+	info_msg "Save linux config..."
+	export PATH=$KERNEL_COMPILER_PATH:$PATH
+	if [ "$LINUX" == "mainline" ]; then
+		cp .config $PKGS_DIR/linux-mainline/configs/${KHADAS_BOARD}.config
+	else
+		make ARCH=arm64 CROSS_COMPILE=${KERNEL_COMPILER} savedefconfig
+		mv defconfig arch/arm64/configs/$LINUX_DEFCONFIG
+	fi
+
+	cd - > /dev/null
 }
